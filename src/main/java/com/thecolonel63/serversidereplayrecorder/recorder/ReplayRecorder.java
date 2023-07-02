@@ -124,7 +124,7 @@ public abstract class ReplayRecorder {
         ReplayRecorder.existing_recorders.add(new WeakReference<>(this));
         status.set(ReplayStatus.Recording);
         Runtime.getRuntime().addShutdownHook(this.shutdownHook);
-        ServerSideReplayRecorderServer.LOGGER.info("Started recording %s:%s".formatted(this.getClass().getSimpleName(), this.getRecordingName()));
+        ServerSideReplayRecorderServer.LOGGER.info("Started new %s".formatted(this.getClass().getSimpleName()));
     }
 
     private final AtomicBoolean compressing = new AtomicBoolean(false);

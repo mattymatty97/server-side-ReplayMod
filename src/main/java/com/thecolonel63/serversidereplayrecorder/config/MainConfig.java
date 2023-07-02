@@ -16,6 +16,7 @@ public class MainConfig {
     private boolean use_username_for_recordings = true;
     private String server_name = "My Server";
     private Set<String> recordable_users = new HashSet<>();
+    private Set<RegionConfig> regions = new HashSet<>();
     private boolean invert_user_list = false;
     private boolean recording_enabled = false;
     private boolean use_server_timestamps = true;
@@ -122,6 +123,14 @@ public class MainConfig {
 
     public void setRecordable_users(Set<String> recordable_users) {
         this.recordable_users = recordable_users;
+    }
+
+    public Set<RegionConfig> getRegions() {
+        return regions;
+    }
+
+    public void setRegions(Set<RegionConfig> regions) {
+        this.regions = regions;
     }
 
     @JsonProperty(value = "invert_user_list")

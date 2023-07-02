@@ -1,17 +1,21 @@
 {
   "schemaVersion": 1,
   "id": "serversidereplayrecorder",
-  "version": "1.20.x",
+  "version": "${version}",
   "name": "Server Side Replay Recorder",
   "description": "Records players and/or specific areas in the popular ReplayMod format",
-  "authors": ["thecolonel63"],
-  "contributors": [{
-    "name": "The__Matty",
-    "contact": {
-      "discord": "mattymatty#9621",
-      "homepage": "https://github.com/mattymatty97"
+  "authors": [
+    "thecolonel63"
+  ],
+  "contributors": [
+    {
+      "name": "The__Matty",
+      "contact": {
+        "discord": "mattymatty#9621",
+        "homepage": "https://github.com/mattymatty97"
+      }
     }
-  }],
+  ],
   "contact": {
     "homepage": "https://github.com/thecolonel63/server-side-replay-recorder",
     "issues": "https://github.com/thecolonel63/server-side-replay-recorder/issues",
