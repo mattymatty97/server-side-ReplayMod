@@ -13,6 +13,7 @@ repositories {
     maven {
         url 'https://masa.dy.fi/maven'
     }
+    maven { url 'https://jitpack.io' }
 }
 
 loom {
@@ -31,7 +32,9 @@ dependencies {
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modCompileOnly "carpet:fabric-carpet:${project.minecraft_version}-${project.carpet_core_version}"
+    //provided group: 'org.apache.commons', name: 'commons-collections4', version: 'latest.release'
     provided "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:latest.release"
+    provided annotationProcessor("com.github.LlamaLad7.mixinextras:mixinextras-fabric:${project.mixin_extras_fabric_version}")
 }
 
 def placeholders = [
@@ -105,7 +108,7 @@ tasks.register("updateBuildNumber"){
     doLast {
         Properties props = new Properties()
 
-        File propsFile = new File("build-${project.minecraft_version}.properties")
+        File propsFile = new File("build.properties")
 
         try {
             props.load(propsFile.newDataInputStream())

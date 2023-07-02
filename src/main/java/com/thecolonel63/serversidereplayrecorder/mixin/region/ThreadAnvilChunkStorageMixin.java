@@ -44,23 +44,23 @@ public abstract class ThreadAnvilChunkStorageMixin implements RegionRecorderStor
 
     @Inject(method = "loadEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ThreadedAnvilChunkStorage$EntityTracker;updateTrackedStatus(Ljava/util/List;)V"), locals = LocalCapture.CAPTURE_FAILHARD)
     void handleEntityLoaded(Entity entity, CallbackInfo ci, EntityType entityType, int i, int j, ThreadedAnvilChunkStorage.EntityTracker entityTracker){
-        ((RegionRecorderEntityTracker)entityTracker).updateTrackedStatus(((RegionRecorderWorld)this.world).getRegionRecorders());
+        ((RegionRecorderEntityTracker)entityTracker).updateTrackedStatus(Set.copyOf(((RegionRecorderWorld)this.world).getRegionRecorders()));
     }
 
     @Inject(method = "tickEntityMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ThreadedAnvilChunkStorage$EntityTracker;updateTrackedStatus(Ljava/util/List;)V", ordinal = 0), locals = LocalCapture.CAPTURE_FAILHARD)
     void handleEntityMovement(CallbackInfo ci, List list, List list2, ObjectIterator var3, ThreadedAnvilChunkStorage.EntityTracker entityTracker, ChunkSectionPos chunkSectionPos, ChunkSectionPos chunkSectionPos2){
-        ((RegionRecorderEntityTracker)entityTracker).updateTrackedStatus(((RegionRecorderWorld)this.world).getRegionRecorders());
+        ((RegionRecorderEntityTracker)entityTracker).updateTrackedStatus(Set.copyOf(((RegionRecorderWorld)this.world).getRegionRecorders()));
     }
 
     @Inject(method = "updatePosition", at = @At(value = "HEAD"))
     void handlePlayerMovement(ServerPlayerEntity player, CallbackInfo ci){
-        ((RegionRecorderEntityTracker)this.entityTrackers.get(player.getId())).updateTrackedStatus(((RegionRecorderWorld)this.world).getRegionRecorders());
+        ((RegionRecorderEntityTracker)this.entityTrackers.get(player.getId())).updateTrackedStatus(Set.copyOf(((RegionRecorderWorld)this.world).getRegionRecorders()));
     }
 
     @Inject(method = "makeChunkTickable", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/CompletableFuture;thenAcceptAsync(Ljava/util/function/Consumer;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"), locals = LocalCapture.CAPTURE_FAILHARD)
     void handleChunkLoaded(ChunkHolder holder, CallbackInfoReturnable<CompletableFuture<Either<WorldChunk, ChunkHolder.Unloaded>>> cir, CompletableFuture completableFuture, CompletableFuture<Either<WorldChunk, ChunkHolder.Unloaded>> completableFuture2){
         completableFuture2.thenApplyAsync(either -> either.ifLeft(worldChunk -> {
-            Set<RegionRecorder> recorders = ((RegionRecorderWorld)this.world).getRegionRecordersByExpandedChunk().get(holder.getPos());
+            Set<RegionRecorder> recorders = Set.copyOf(((RegionRecorderWorld)this.world).getRegionRecordersByExpandedChunk().get(holder.getPos()));
             if (recorders != null)
                 recorders.forEach( r -> {
                     r.onPacket(new ChunkDataS2CPacket(worldChunk, this.getLightingProvider(), null, null));

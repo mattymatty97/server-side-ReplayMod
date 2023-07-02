@@ -230,7 +230,7 @@ public class ReplayCommand {
                                 .executes(context -> {
                                     context.getSource().sendFeedback(()->Text.literal("Recording " + ((ServerSideReplayRecorderServer.config.isRecording_enabled()) ? "Enabled" : "Disabled")).formatted(Formatting.YELLOW), true);
 
-                                    Collection<ReplayRecorder> recorders = ReplayRecorder.writing_recorders;
+                                    Collection<ReplayRecorder> recorders = ReplayRecorder.get_existing_recorders();
 
                                     if (!recorders.isEmpty()) {
                                         context.getSource().sendFeedback(

@@ -1,4 +1,4 @@
-package com.thecolonel63.serversidereplayrecorder.util;
+package com.thecolonel63.serversidereplayrecorder.util.packets;
 
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.listener.PacketListener;

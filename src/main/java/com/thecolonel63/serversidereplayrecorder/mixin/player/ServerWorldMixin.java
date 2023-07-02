@@ -13,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.Set;
+
 @Mixin(ServerWorld.class)
 public class ServerWorldMixin {
 
@@ -42,6 +44,6 @@ public class ServerWorldMixin {
     //Block breaking
     @Inject(method = "setBlockBreakingInfo", at = @At("TAIL"))
     private void saveBlockBreakingProgressPacket(int entityId, BlockPos pos, int progress, CallbackInfo ci) {
-        PlayerRecorder.playerRecorderMap.forEach((connection, playerThreadRecorder) -> playerThreadRecorder.onBlockBreakAnim(entityId, pos, progress));
+        Set.copyOf(PlayerRecorder.playerRecorderMap.values()).forEach((playerThreadRecorder) -> playerThreadRecorder.onBlockBreakAnim(entityId, pos, progress));
     }
 }

@@ -26,7 +26,7 @@ public class ChunkHolderMixin {
 
     @Inject(method = "sendPacketToPlayers", at=@At("HEAD"))
     void handleChunkUpdate(List<ServerPlayerEntity> players, Packet<?> packet, CallbackInfo ci){
-        Set<RegionRecorder> recorders = ((RegionRecorderWorld)this.world).getRegionRecordersByChunk().get(this.pos);
+        Set<RegionRecorder> recorders = Set.copyOf(((RegionRecorderWorld)this.world).getRegionRecordersByChunk().get(this.pos));
         if (recorders != null)
             recorders.forEach( r -> r.onPacket(packet));
     }

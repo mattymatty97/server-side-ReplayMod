@@ -6,7 +6,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.thecolonel63.serversidereplayrecorder.ServerSideReplayRecorderServer;
 import com.thecolonel63.serversidereplayrecorder.util.FileHandlingUtility;
-import com.thecolonel63.serversidereplayrecorder.util.WrappedPacket;
+import com.thecolonel63.serversidereplayrecorder.util.packets.FuturePacket;
+import com.thecolonel63.serversidereplayrecorder.util.packets.WrappedPacket;
 import io.netty.buffer.Unpooled;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.MinecraftVersion;
@@ -27,6 +28,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.io.*;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Paths;
@@ -38,12 +40,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
 import static com.thecolonel63.serversidereplayrecorder.ServerSideReplayRecorderServer.placeholders;
 
 public abstract class ReplayRecorder {
 
     public static final Set<ReplayRecorder> active_recorders = new HashSet<>();
-    public static final Set<ReplayRecorder> writing_recorders = new HashSet<>();
+    public static final Set<WeakReference<ReplayRecorder>> existing_recorders = new HashSet<>();
+    public static void prune_existing_recorders(){
+        existing_recorders.removeIf(curr -> curr.refersTo(null));
+    }
+    public static Collection<ReplayRecorder> get_existing_recorders(){
+        prune_existing_recorders();
+        return existing_recorders.stream().filter(r -> !r.refersTo(null)).map(WeakReference::get).collect(Collectors.toSet());
+    }
+
+    private final Thread shutdownHook = new Thread(this::handleDisconnect);
     public final MinecraftServer ms = ServerSideReplayRecorderServer.server;
     protected final File tmp_folder;
     protected final File recording_file;
@@ -108,12 +121,13 @@ public abstract class ReplayRecorder {
             debugFile.write("[{}\n");
         }else
             debugFile = null;
-        ReplayRecorder.writing_recorders.add(this);
+        ReplayRecorder.existing_recorders.add(new WeakReference<>(this));
         status.set(ReplayStatus.Recording);
+        Runtime.getRuntime().addShutdownHook(this.shutdownHook);
         ServerSideReplayRecorderServer.LOGGER.info("Started recording %s:%s".formatted(this.getClass().getSimpleName(), this.getRecordingName()));
     }
 
-    AtomicBoolean compressing = new AtomicBoolean(false);
+    private final AtomicBoolean compressing = new AtomicBoolean(false);
     private void writeMetaData(boolean isFinishing) {
         if (compressing.compareAndSet(false, isFinishing)) {
             try {
@@ -231,7 +245,7 @@ public abstract class ReplayRecorder {
                         gameJoinS2CPacket.lastDeathLocation(),
                         gameJoinS2CPacket.portalCooldown()
                 );
-            }else if (packet instanceof ChunkLoadDistanceS2CPacket loadDistanceS2CPacket){
+            }else if (packet instanceof ChunkLoadDistanceS2CPacket){
                 packet = new ChunkLoadDistanceS2CPacket(0);
             }
         }
@@ -286,8 +300,8 @@ public abstract class ReplayRecorder {
                     } catch (Throwable e) {
                         e.printStackTrace();
                     } finally {
-                        writing_recorders.remove(this);
                         this.status.set(ReplayStatus.Saved);
+                        Runtime.getRuntime().removeShutdownHook(this.shutdownHook);
                     }
                 };
                 if (immediate) {
@@ -352,6 +366,22 @@ public abstract class ReplayRecorder {
     private final AtomicBoolean metadataQueued = new AtomicBoolean(false);
 
     private void _save(Packet<?> packet, int timestamp) {
+
+        if (packet instanceof FuturePacket futurePacket){
+            Packet<?> future = null;
+
+            try {
+                if (futurePacket.getTimeout() > 0){
+                    ServerSideReplayRecorderServer.LOGGER.debug("Waiting for FuturePacket");
+                    future = futurePacket.get(futurePacket.getTimeout(), TimeUnit.MILLISECONDS);
+                    ServerSideReplayRecorderServer.LOGGER.debug("Got FuturePacket");
+                }
+            }catch (Throwable ignored){}
+
+            if (future == null)
+                return;
+            packet = future;
+        }
 
         if(this.current_file_size.get() > ServerSideReplayRecorderServer.config.getMax_file_size()){
             if (tooBigFileSize.compareAndSet(false,true)) {

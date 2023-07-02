@@ -48,10 +48,7 @@ public class ServerSideReplayRecorderServer implements ModInitializer {
 
     public static void loadConfig() {
         try {
-
-//            yaml.findAndRegisterModules();
             config = yaml.readValue(new FileReader(configPath), MainConfig.class);
-
         }catch (FileNotFoundException e){
             System.out.println("Config file not found, creating with default values...");
             saveConfig();
@@ -62,7 +59,6 @@ public class ServerSideReplayRecorderServer implements ModInitializer {
 
     public static void saveConfig() {
         try {
-//            yaml.findAndRegisterModules();
             //noinspection ResultOfMethodCallIgnored
             new File(FabricLoader.getInstance().getConfigDir().toString()).mkdirs();
             BufferedWriter writer = new BufferedWriter(new FileWriter(configPath));

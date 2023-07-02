@@ -44,14 +44,14 @@ public abstract class EntityTrackerMixin implements RegionRecorderEntityTracker 
 
     @Inject(method = "sendToOtherNearbyPlayers", at = @At("HEAD"))
     void sendToNearbyPlayers(Packet<?> packet, CallbackInfo ci){
-        for (RegionRecorder recorder : this.listenening_recorders){
+        for (RegionRecorder recorder : Set.copyOf(this.listenening_recorders)){
             recorder.onPacket(packet);
         }
     }
 
     @Inject(method = "stopTracking()V", at = @At("HEAD"))
     void stopTracking(CallbackInfo ci){
-        for (RegionRecorder recorder : this.listenening_recorders){
+        for (RegionRecorder recorder : Set.copyOf(this.listenening_recorders)){
             this.stopTracking(recorder);
         }
     }

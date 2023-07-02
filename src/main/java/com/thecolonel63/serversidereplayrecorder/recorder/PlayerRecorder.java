@@ -3,7 +3,7 @@ package com.thecolonel63.serversidereplayrecorder.recorder;
 import com.mojang.authlib.GameProfile;
 import com.thecolonel63.serversidereplayrecorder.ServerSideReplayRecorderServer;
 import com.thecolonel63.serversidereplayrecorder.mixin.main.LoginSuccessfulS2CPacketAccessor;
-import com.thecolonel63.serversidereplayrecorder.util.WrappedPacket;
+import com.thecolonel63.serversidereplayrecorder.util.packets.WrappedPacket;
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.LightUpdatePacketAccessor;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.entity.player.PlayerEntity;

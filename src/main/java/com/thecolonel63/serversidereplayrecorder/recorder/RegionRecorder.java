@@ -3,7 +3,8 @@ package com.thecolonel63.serversidereplayrecorder.recorder;
 import com.mojang.authlib.GameProfile;
 import com.thecolonel63.serversidereplayrecorder.ServerSideReplayRecorderServer;
 import com.thecolonel63.serversidereplayrecorder.util.ChunkBox;
-import com.thecolonel63.serversidereplayrecorder.util.WrappedPacket;
+import com.thecolonel63.serversidereplayrecorder.util.packets.FuturePacket;
+import com.thecolonel63.serversidereplayrecorder.util.packets.WrappedPacket;
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.LightUpdatePacketAccessor;
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.RegionRecorderStorage;
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.RegionRecorderWorld;
@@ -172,37 +173,45 @@ public class RegionRecorder extends ReplayRecorder {
 
         //load all watched chunks data
         for (ChunkPos pos : this.region.expandedChunks ){
-            //get chunk, load if needed, no create
-            //this call is deferred to the MainServer executor which runs at the end of a tick in the spare time
-            Chunk chunk = world.getChunk(pos.x,pos.z, ChunkStatus.EMPTY);
-            WorldChunk worldChunk = null;
-            if (chunk instanceof  WorldChunk)
-                worldChunk = (WorldChunk) chunk;
-            else if (chunk instanceof WrapperProtoChunk readOnlyChunk) {
-                worldChunk = readOnlyChunk.getWrappedChunk();
-            }
-            // if chunk was already generated
-            if(worldChunk != null) {
-                //if center chunk has data
-                if (pos.equals(this.region.center)) {
-
-                    //find the highest non-transparent block as viewpoint
-                    int surface_y = worldChunk.sampleHeightmap(Heightmap.Type.MOTION_BLOCKING, viewpoint.getX(), viewpoint.getZ());
-                    BlockPos b_pos = new BlockPos(viewpoint.getX(), surface_y, viewpoint.getZ());
-                    while (!worldChunk.getBlockState(b_pos).isOpaque() && surface_y != chunk.getBottomY()) {
-                        b_pos = new BlockPos(viewpoint.getX(), --surface_y, viewpoint.getZ());
-                    }
-                    //if no blocks are found in the column keep the original viewpoint
-                    if (surface_y != chunk.getBottomY())
-                        this.viewpoint = new Vec3i(viewpoint.getX(), surface_y + 1, viewpoint.getZ());
+            FuturePacket packet = new FuturePacket(() -> {
+                //get chunk, load if needed, no create
+                //this call is deferred to the MainServer executor which runs at the end of a tick in the spare time
+                Chunk chunk = world.getChunk(pos.x,pos.z, ChunkStatus.EMPTY);
+                WorldChunk worldChunk = null;
+                if (chunk instanceof  WorldChunk)
+                    worldChunk = (WorldChunk) chunk;
+                else if (chunk instanceof WrapperProtoChunk readOnlyChunk) {
+                    worldChunk = readOnlyChunk.getWrappedChunk();
                 }
-                //save chunk
-                onPacket(new WrappedPacket(new ChunkDataS2CPacket(worldChunk, world.getLightingProvider(), null, null)));
-                //--obsolete in new versions
-                //onPacket(new WrappedPacket(new LightUpdateS2CPacket(pos, world.getLightingProvider(), null, null, true)));
-                known_chunk_data.add(pos);
-                known_chunk_light.add(pos);
-            }
+                // if chunk was already generated
+                if(worldChunk != null) {
+                    //if center chunk has data
+                    if (pos.equals(this.region.center)) {
+
+                        //find the highest non-transparent block as viewpoint
+                        int surface_y = worldChunk.sampleHeightmap(Heightmap.Type.MOTION_BLOCKING, viewpoint.getX(), viewpoint.getZ());
+                        BlockPos b_pos = new BlockPos(viewpoint.getX(), surface_y, viewpoint.getZ());
+                        while (!worldChunk.getBlockState(b_pos).isOpaque() && surface_y != chunk.getBottomY()) {
+                            b_pos = new BlockPos(viewpoint.getX(), --surface_y, viewpoint.getZ());
+                        }
+                        //if no blocks are found in the column keep the original viewpoint
+                        if (surface_y != chunk.getBottomY()) {
+                            this.viewpoint = new Vec3i(viewpoint.getX(), surface_y + 1, viewpoint.getZ());
+                            onPacket(new PlayerPositionLookS2CPacket(viewpoint.getX() + 0.5d,viewpoint.getY(),viewpoint.getZ() + 0.5d,0f,0f, Collections.emptySet(),0));
+                        }
+                    }
+
+                    known_chunk_data.add(pos);
+                    known_chunk_light.add(pos);
+                    //save chunk
+                    return new ChunkDataS2CPacket(worldChunk, world.getLightingProvider(), null, null);
+                }
+                return null;
+            });
+            //let the packet be created in the future while still be written at the start of the replay
+            packet.setExpectedDuration(30000);
+            FuturePacket.packetExecutor.submit(packet);
+            onPacket(packet);
         }
 
         //register as an entity watcher ( this will also send all the packets for spawning entities already in the region )

@@ -41,7 +41,7 @@ public class EntityTrackerMixin implements RecorderHolder {
         }
     }
 
-    Set<Packet<?>> packets_to_ignore = new HashSet<>();
+    final Set<Packet<?>> packets_to_ignore = new HashSet<>();
 
     @Inject(method = "<init>", at = @At("RETURN"))
     void constructor(ThreadedAnvilChunkStorage threadedAnvilChunkStorage, Entity entity, int maxDistance, int tickInterval, boolean alwaysUpdateVelocity, CallbackInfo ci){
