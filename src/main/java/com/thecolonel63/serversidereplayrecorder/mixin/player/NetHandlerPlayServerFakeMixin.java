@@ -10,8 +10,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Optional;
 
-import static com.thecolonel63.serversidereplayrecorder.recorder.PlayerRecorder.playerRecorderMap;
-
 @Mixin(NetHandlerPlayServerFake.class)
 public abstract class NetHandlerPlayServerFakeMixin {
 

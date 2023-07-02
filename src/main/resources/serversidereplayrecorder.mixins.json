@@ -4,8 +4,8 @@
   "package": "com.thecolonel63.serversidereplayrecorder.mixin",
   "compatibilityLevel": "JAVA_17",
   "server": [
-    "main.LightUpdatePacketMixin",
     "commands.CommandManagerMixin",
+    "main.LightUpdatePacketMixin",
     "main.LoginSuccessfulS2CPacketAccessor",
     "main.MinecraftServerMixin",
     "player.EntityTrackerMixin",

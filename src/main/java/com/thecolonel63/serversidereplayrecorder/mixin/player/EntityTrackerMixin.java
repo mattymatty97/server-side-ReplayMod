@@ -17,7 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.ref.WeakReference;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
 
 @Mixin(ThreadedAnvilChunkStorage.EntityTracker.class)

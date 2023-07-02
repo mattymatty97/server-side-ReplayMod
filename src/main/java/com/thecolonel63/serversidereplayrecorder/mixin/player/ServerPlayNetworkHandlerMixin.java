@@ -1,14 +1,11 @@
 package com.thecolonel63.serversidereplayrecorder.mixin.player;
 
-import com.mojang.brigadier.ParseResults;
-import com.thecolonel63.serversidereplayrecorder.recorder.PlayerRecorder;
 import com.thecolonel63.serversidereplayrecorder.recorder.ReplayRecorder;
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.RecorderHolder;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.PacketCallbacks;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;

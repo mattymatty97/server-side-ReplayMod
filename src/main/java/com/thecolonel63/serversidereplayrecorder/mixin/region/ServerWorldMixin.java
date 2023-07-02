@@ -1,5 +1,6 @@
 package com.thecolonel63.serversidereplayrecorder.mixin.region;
 
+import com.llamalad7.mixinextras.sugar.Local;
 import com.thecolonel63.serversidereplayrecorder.recorder.RegionRecorder;
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.RegionRecorderWorld;
 import net.minecraft.entity.Entity;
@@ -20,7 +21,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -51,22 +51,23 @@ public class ServerWorldMixin implements RegionRecorderWorld {
     }
 
     @Inject(method = "setBlockBreakingInfo", at = @At("HEAD"))
-    void handleBreaking(int entityId, BlockPos pos, int progress, CallbackInfo ci){
-        Set.copyOf(getRegionRecorders()).stream().filter(r -> r.region.isInBox(new Vec3d(pos.getX(),pos.getY(),pos.getZ()))).forEach(
+    void handleBreaking(int entityId, BlockPos pos, int progress, CallbackInfo ci) {
+        Set.copyOf(getRegionRecorders()).stream().filter(r -> r.region.isInBox(new Vec3d(pos.getX(), pos.getY(), pos.getZ()))).forEach(
                 r -> r.onPacket(new BlockBreakingProgressS2CPacket(entityId, pos, progress))
         );
     }
-    @Inject(method = "createExplosion", at = @At(value = "RETURN"), locals = LocalCapture.CAPTURE_FAILHARD)
-    private void handleExplosion(Entity entity, DamageSource damageSource, ExplosionBehavior behavior, double x, double y, double z, float power, boolean createFire, World.ExplosionSourceType explosionSourceType, CallbackInfoReturnable<Explosion> cir, Explosion explosion) {
-        Set.copyOf(getRegionRecorders()).stream().filter(r -> r.region.isInBox(new Vec3d(x,y,z))).forEach(
+
+    @Inject(method = "createExplosion", at = @At(value = "RETURN"))
+    private void handleExplosion(Entity entity, DamageSource damageSource, ExplosionBehavior behavior, double x, double y, double z, float power, boolean createFire, World.ExplosionSourceType explosionSourceType, CallbackInfoReturnable<Explosion> cir, @Local Explosion explosion) {
+        Set.copyOf(getRegionRecorders()).stream().filter(r -> r.region.isInBox(new Vec3d(x, y, z))).forEach(
                 r -> r.onPacket(new ExplosionS2CPacket(x, y, z, power, explosion.getAffectedBlocks(), Vec3d.ZERO))
         );
     }
 
     @Inject(method = "spawnParticles(Lnet/minecraft/particle/ParticleEffect;DDDIDDDD)I", at = @At(value = "HEAD"))
     private <T extends ParticleEffect> void handleParticles(T particle, double x, double y, double z, int count, double deltaX, double deltaY, double deltaZ, double speed, CallbackInfoReturnable<Integer> cir) {
-        Set.copyOf(getRegionRecorders()).stream().filter(r -> r.region.isInBox(new Vec3d(x,y,z))).forEach(
-                r -> r.onPacket(new ParticleS2CPacket(particle, false, x, y, z, (float)deltaX, (float)deltaY, (float)deltaZ, (float)speed, count))
+        Set.copyOf(getRegionRecorders()).stream().filter(r -> r.region.isInBox(new Vec3d(x, y, z))).forEach(
+                r -> r.onPacket(new ParticleS2CPacket(particle, false, x, y, z, (float) deltaX, (float) deltaY, (float) deltaZ, (float) speed, count))
         );
     }
 
