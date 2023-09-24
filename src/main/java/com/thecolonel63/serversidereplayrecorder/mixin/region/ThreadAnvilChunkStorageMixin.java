@@ -58,7 +58,7 @@ public abstract class ThreadAnvilChunkStorageMixin implements RegionRecorderStor
     /**
      * lambda method in {@see net.minecraft.server.world.ThreadedAnvilChunkStorage#makeChunkTickable }
      */
-    @Inject(method = "method_18193", at = @At(value = "RETURN"))
+    @Inject(method = "method_53684", at = @At(value = "RETURN"))
     void handleChunkLoaded(ChunkHolder chunkHolder, WorldChunk chunk, CallbackInfo ci, @Local MutableObject<ChunkDataS2CPacket> cachedDataPacket) {
         Set<RegionRecorder> recorders = Set.copyOf(((RegionRecorderWorld) this.world).getRegionRecordersByExpandedChunk().get(chunkHolder.getPos()));
         if (recorders != null) {

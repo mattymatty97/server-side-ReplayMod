@@ -18,11 +18,11 @@ public class MainConfig {
     private Set<String> recordable_users = new HashSet<>();
     private Set<RegionConfig> regions = new HashSet<>();
     private boolean invert_user_list = false;
-    private boolean recording_enabled = false;
+    private boolean recording_enabled = true;
     private boolean use_server_timestamps = true;
     private boolean assume_unloaded_chunks_dont_change = true;
     private boolean render_distance_fog_fix = false;
-    private long  max_file_size = 10000000000L;
+    private long max_file_size = 1000000000L;
     private URL file_storage_url;
     private boolean debug = false;
 

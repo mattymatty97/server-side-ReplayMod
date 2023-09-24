@@ -8,16 +8,17 @@ import com.thecolonel63.serversidereplayrecorder.util.interfaces.RegionRecorderS
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.RegionRecorderWorld;
 import com.thecolonel63.serversidereplayrecorder.util.packets.FuturePacket;
 import com.thecolonel63.serversidereplayrecorder.util.packets.WrappedPacket;
-import io.netty.buffer.Unpooled;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.ClientBrandRetriever;
 import net.minecraft.entity.player.PlayerAbilities;
 import net.minecraft.item.ItemStack;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.packet.BrandCustomPayload;
 import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.c2s.common.CustomPayloadC2SPacket;
+import net.minecraft.network.packet.c2s.config.ReadyC2SPacket;
+import net.minecraft.network.packet.s2c.common.ResourcePackSendS2CPacket;
 import net.minecraft.network.packet.s2c.login.LoginSuccessS2CPacket;
 import net.minecraft.network.packet.s2c.play.*;
-import net.minecraft.registry.tag.TagPacketSerializer;
-import net.minecraft.resource.featuretoggle.FeatureFlags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Uuids;
 import net.minecraft.util.collection.DefaultedList;
@@ -28,6 +29,7 @@ import net.minecraft.world.GameMode;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.WorldProperties;
+import net.minecraft.world.biome.source.BiomeAccess;
 import net.minecraft.world.border.WorldBorder;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
@@ -102,32 +104,29 @@ public class RegionRecorder extends ReplayRecorder {
         onPacket(new GameJoinS2CPacket(
                 0,
                 worldProperties.isHardcore(),
-                GameMode.SPECTATOR,
-                GameMode.SPECTATOR,
                 ms.getWorldRegistryKeys(),
-                ms.getRegistryManager().toImmutable(),
-                world.getDimensionKey(),
-                world.getRegistryKey(),
-                world.getSeed(),
                 ms.getMaxPlayerCount(),
                 region.radius,
                 region.radius,
                 false,
                 false,
-                world.isDebugWorld(),
-                world.isFlat(),
-                Optional.empty(),
-                0
+                false,
+                new CommonPlayerSpawnInfo(
+                        world.getDimensionKey(),
+                        world.getRegistryKey(),
+                        BiomeAccess.hashSeed(world.getSeed()),
+                        GameMode.SPECTATOR,
+                        GameMode.SPECTATOR,
+                        world.isDebugWorld(),
+                        world.isFlat(),
+                        Optional.empty(),
+                        0
+                )
         ));
-        onPacket(new FeaturesS2CPacket(FeatureFlags.FEATURE_MANAGER.toId(world.getEnabledFeatures())));
-        onPacket(
-                new CustomPayloadS2CPacket(CustomPayloadS2CPacket.BRAND, new PacketByteBuf(Unpooled.buffer()).writeString(ms.getServerModName()))
-        );
         onPacket(new DifficultyS2CPacket(worldProperties.getDifficulty(), worldProperties.isDifficultyLocked()));
         onPacket(new PlayerAbilitiesS2CPacket(new PlayerAbilities()));
         onPacket(new UpdateSelectedSlotS2CPacket(0));
         onPacket(new SynchronizeRecipesS2CPacket(ms.getRecipeManager().values()));
-        onPacket(new SynchronizeTagsS2CPacket(TagPacketSerializer.serializeTags(ms.getCombinedDynamicRegistries())));
 
         //save current player list
         ms.getPlayerManager().getPlayerList().forEach( p -> onPacket(new PlayerListS2CPacket(PlayerListS2CPacket.Action.ADD_PLAYER, p)));
@@ -142,9 +141,6 @@ public class RegionRecorder extends ReplayRecorder {
             onPacket(new GameStateChangeS2CPacket(GameStateChangeS2CPacket.RAIN_GRADIENT_CHANGED, world.getRainGradient(1.0F)));
             onPacket(new GameStateChangeS2CPacket(GameStateChangeS2CPacket.THUNDER_GRADIENT_CHANGED, world.getThunderGradient(1.0F)));
         }
-        ms
-                .getResourcePackProperties()
-                .ifPresent(properties -> onPacket(new ResourcePackSendS2CPacket(properties.url(), properties.hash(), properties.isRequired(), properties.prompt())));
 
         //register as world (dimension) event listeners
         ((RegionRecorderWorld) world).getRegionRecorders().add(this);
@@ -154,9 +150,17 @@ public class RegionRecorder extends ReplayRecorder {
     }
 
     public void init(){
-        //skip the login Phase and start immediatly with the Game packets
+        //move to Configuration Phase
         onPacket(new LoginSuccessS2CPacket(FAKE_GAMEPROFILE));
 
+        ms.getResourcePackProperties()
+                .ifPresent(properties ->
+                        onPacket(new ResourcePackSendS2CPacket(properties.url(), properties.hash(), properties.isRequired(), properties.prompt())));
+
+        onPacket(new CustomPayloadC2SPacket(new BrandCustomPayload(ClientBrandRetriever.getClientModName())));
+
+        //move to Game Phase
+        onPacket(new ReadyC2SPacket());
 
         //this code is mandatory to be run in the Main Server Thread
         if (Thread.currentThread() == ms.getThread()){
@@ -231,7 +235,7 @@ public class RegionRecorder extends ReplayRecorder {
     public void onPacket(Packet<?> packet) {
         if(ServerSideReplayRecorderServer.config.isAssume_unloaded_chunks_dont_change()){
             if(packet instanceof ChunkDataS2CPacket newChunk) {
-                ChunkPos pos = new ChunkPos(newChunk.getX(), newChunk.getZ());
+                ChunkPos pos = new ChunkPos(newChunk.getChunkX(), newChunk.getChunkZ());
                 if (known_chunk_data.contains(pos))
                     return; //skip chunk data as it was already recorded previously
                 else

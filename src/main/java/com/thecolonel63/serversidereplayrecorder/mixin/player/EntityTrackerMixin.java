@@ -1,5 +1,6 @@
 package com.thecolonel63.serversidereplayrecorder.mixin.player;
 
+import com.thecolonel63.serversidereplayrecorder.mixin.accessors.ServerCommonNetworkHandlerAccessor;
 import com.thecolonel63.serversidereplayrecorder.recorder.PlayerRecorder;
 import com.thecolonel63.serversidereplayrecorder.recorder.ReplayRecorder;
 import com.thecolonel63.serversidereplayrecorder.util.interfaces.RecorderHolder;
@@ -45,7 +46,7 @@ public class EntityTrackerMixin implements RecorderHolder {
     @Inject(method = "<init>", at = @At("RETURN"))
     void constructor(ThreadedAnvilChunkStorage threadedAnvilChunkStorage, Entity entity, int maxDistance, int tickInterval, boolean alwaysUpdateVelocity, CallbackInfo ci){
         if (entity instanceof ServerPlayerEntity serverPlayer){
-            this.setRecorder(PlayerRecorder.playerRecorderMap.get(serverPlayer.networkHandler.connection));
+            this.setRecorder(PlayerRecorder.playerRecorderMap.get(((ServerCommonNetworkHandlerAccessor) serverPlayer.networkHandler).getConnection()));
         }
     }
 

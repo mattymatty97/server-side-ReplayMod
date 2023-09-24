@@ -17,7 +17,6 @@ import net.minecraft.network.NetworkState;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.login.LoginCompressionS2CPacket;
-import net.minecraft.network.packet.s2c.login.LoginSuccessS2CPacket;
 import net.minecraft.network.packet.s2c.play.BundleS2CPacket;
 import net.minecraft.network.packet.s2c.play.ChunkLoadDistanceS2CPacket;
 import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
@@ -67,7 +66,7 @@ public abstract class ReplayRecorder {
     protected final AtomicLong start = new AtomicLong();
     protected final AtomicInteger server_start = new AtomicInteger();
     protected final String fileName;
-    protected NetworkState state = NetworkState.LOGIN;
+    protected NetworkState state = NetworkState.HANDSHAKING;
     protected final AtomicInteger server_timestamp = new AtomicInteger();
 
     protected final AtomicInteger last_timestamp = new AtomicInteger();
@@ -151,8 +150,8 @@ public abstract class ReplayRecorder {
                 this.writeMarkers();
                 if (isFinishing)
                     compressReplay();
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
+            } catch (IOException e) {
+                ServerSideReplayRecorderServer.LOGGER.error("Exception in %s:%s while writing metadata".formatted(this.getClass().getSimpleName(), this.getRecordingName()), e);
             } finally {
                 this.metadataQueued.set(false);
             }
@@ -162,13 +161,13 @@ public abstract class ReplayRecorder {
     private final JsonArray markers = new JsonArray();
     private void writeMarkers() {
         try {
-            if (markers.size()>0) {
+            if (!markers.isEmpty()) {
                 FileWriter fw = new FileWriter(Paths.get(tmp_folder.getAbsolutePath(), "markers.json").toFile(), false);
                 fw.write(markers.toString());
                 fw.close();
             }
-        } catch (IOException ioException) {
-            ioException.printStackTrace();
+        } catch (IOException e) {
+            ServerSideReplayRecorderServer.LOGGER.error("Exception in %s:%s while writing markers".formatted(this.getClass().getSimpleName(), this.getRecordingName()), e);
         }
     }
 
@@ -214,7 +213,7 @@ public abstract class ReplayRecorder {
             }
             ServerSideReplayRecorderServer.LOGGER.info("Replay %s Saved".formatted(this.out_file));
         } catch (Exception e) {
-            e.printStackTrace();
+            ServerSideReplayRecorderServer.LOGGER.error("Exception in %s:%s while compressing the replay".formatted(this.getClass().getSimpleName(), this.getRecordingName()), e);
         }
 
     }
@@ -227,23 +226,15 @@ public abstract class ReplayRecorder {
             if (packet instanceof GameJoinS2CPacket gameJoinS2CPacket){
                 packet = new GameJoinS2CPacket(
                         gameJoinS2CPacket.playerEntityId(),
-                        gameJoinS2CPacket.debugWorld(),
-                        gameJoinS2CPacket.previousGameMode(),
-                        gameJoinS2CPacket.gameMode(),
+                        gameJoinS2CPacket.hardcore(),
                         gameJoinS2CPacket.dimensionIds(),
-                        gameJoinS2CPacket.registryManager(),
-                        gameJoinS2CPacket.dimensionType(),
-                        gameJoinS2CPacket.dimensionId(),
-                        gameJoinS2CPacket.sha256Seed(),
                         gameJoinS2CPacket.maxPlayers(),
-                        0,
-                        0,
+                        -1,
+                        gameJoinS2CPacket.simulationDistance(),
                         gameJoinS2CPacket.reducedDebugInfo(),
                         gameJoinS2CPacket.showDeathScreen(),
-                        gameJoinS2CPacket.debugWorld(),
-                        gameJoinS2CPacket.flatWorld(),
-                        gameJoinS2CPacket.lastDeathLocation(),
-                        gameJoinS2CPacket.portalCooldown()
+                        gameJoinS2CPacket.doLimitedCrafting(),
+                        gameJoinS2CPacket.commonPlayerSpawnInfo()
                 );
             }else if (packet instanceof ChunkLoadDistanceS2CPacket){
                 packet = new ChunkLoadDistanceS2CPacket(0);
@@ -298,7 +289,7 @@ public abstract class ReplayRecorder {
 
                         writeMetaData(true);
                     } catch (Throwable e) {
-                        e.printStackTrace();
+                        ServerSideReplayRecorderServer.LOGGER.error("Exception in %s:%s while writing additional files".formatted(this.getClass().getSimpleName(), this.getRecordingName()), e);
                     } finally {
                         this.status.set(ReplayStatus.Saved);
                         Runtime.getRuntime().removeShutdownHook(this.shutdownHook);
@@ -406,24 +397,17 @@ public abstract class ReplayRecorder {
                 buffer.write(intToByteArray(timestamp));
                 buffer.write(intToByteArray(buf.readableBytes() + 1));
 
-                if (packet instanceof LoginSuccessS2CPacket) {
-                    state = NetworkState.PLAY;
-                    //We are now dealing with "playing" packets, so set the network state accordingly.
-                }
-
                 //Get the packet ID
-                Integer packetId = state.getPacketId(NetworkSide.CLIENTBOUND, packet);
-                if (packet instanceof LoginSuccessS2CPacket) {
-                    packetId = 2; //Here because the connection state was already changed when the packet was first read, so trying to do the above *will* result in an error.
+                int packetId = this._getPacketId(packet);
+
+                if (packetId == -1) {
+                    //The packet ID is something we do not have an ID for.
+                    ServerSideReplayRecorderServer.LOGGER.error("%s:%s Unknown packet ID for class %s".formatted(this.getClass().getSimpleName(), this.getRecordingName(), packet.getClass()));
+                    return;
                 }
 
-                if (packetId == null) {
-                    //The packet ID is something we do not have an ID for.
-                    throw new IOException("Unknown packet ID for class " + packet.getClass());
-                } else {
-                    //Write the packet ID.
-                    buffer.write(packetId);
-                }
+                //Write the packet ID.
+                buffer.write(packetId);
 
                 //Write the packet.
                 buffer.write(buf.array(), 0, buf.readableBytes());
@@ -443,9 +427,22 @@ public abstract class ReplayRecorder {
                 ServerSideReplayRecorderServer.LOGGER.warn("Disk space is too low, stopping recording %s:%s".formatted(this.getClass().getSimpleName(), this.getRecordingName()));
                 this.handleDisconnect(true);
             }else {
-                e.printStackTrace();
+                ServerSideReplayRecorderServer.LOGGER.error("Exception in %s:%s while saving %s".formatted(this.getClass().getSimpleName(), this.getRecordingName(), packet.getClass()), e);
             }
         }
+    }
+
+
+    private int _getPacketId(Packet<?> packet) {
+        int packetId = this.state.getHandler(NetworkSide.CLIENTBOUND).getId(packet);
+
+        NetworkState new_state = packet.getNewNetworkState();
+
+        if (new_state != null) {
+            this.state = new_state;
+        }
+
+        return packetId;
     }
 
     protected byte[] intToByteArray(int input) {

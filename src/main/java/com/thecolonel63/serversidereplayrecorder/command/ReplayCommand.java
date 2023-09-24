@@ -7,6 +7,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.thecolonel63.serversidereplayrecorder.ServerSideReplayRecorderServer;
 import com.thecolonel63.serversidereplayrecorder.config.RegionConfig;
+import com.thecolonel63.serversidereplayrecorder.mixin.accessors.ServerCommonNetworkHandlerAccessor;
 import com.thecolonel63.serversidereplayrecorder.recorder.PlayerRecorder;
 import com.thecolonel63.serversidereplayrecorder.recorder.RegionRecorder;
 import com.thecolonel63.serversidereplayrecorder.recorder.ReplayRecorder;
@@ -202,7 +203,7 @@ public class ReplayCommand {
                                                                                                     return 1;
                                                                                                 } else {
                                                                                                     ChunkBox box = new ChunkBox(cpos1, cpos2);
-                                                                                                    RegionConfig regionConfig = new RegionConfig(regionName, source.getWorld().getRegistryKey().getValue().toString(), box.min.x, box.min.z, box.max.x, box.max.z);
+                                                                                                    RegionConfig regionConfig = new RegionConfig(regionName, source.getWorld().getRegistryKey().getValue().toString(), new RegionConfig.ChunkCoord(box.min.x, box.min.z), new RegionConfig.ChunkCoord(box.max.x, box.max.z));
                                                                                                     ServerSideReplayRecorderServer.config.getRegions().add(regionConfig);
                                                                                                     ServerSideReplayRecorderServer.saveConfig();
                                                                                                     source.sendFeedback(() -> Text.literal("Defined region %s, from %d %d to %d %d in world %s".formatted(regionName, box.min.x, box.min.z, box.max.x, box.max.z, regionConfig.world())).formatted(Formatting.YELLOW), true);
@@ -226,11 +227,17 @@ public class ReplayCommand {
                                                                 context.getSource().sendError(Text.literal("Region %s is not defined".formatted(regionName)).formatted(Formatting.RED));
                                                                 return 0;
                                                             } else {
-                                                                ServerCommandSource source = context.getSource();
-                                                                ServerSideReplayRecorderServer.config.getRegions().remove(cfg);
-                                                                ServerSideReplayRecorderServer.saveConfig();
-                                                                source.sendFeedback(() -> Text.literal("Region %s forgotten".formatted(regionName)).formatted(Formatting.YELLOW), true);
-                                                                return -1;
+                                                                RegionRecorder recorder = RegionRecorder.regionRecorderMap.get(regionName);
+                                                                if (recorder == null) {
+                                                                    ServerCommandSource source = context.getSource();
+                                                                    ServerSideReplayRecorderServer.config.getRegions().remove(cfg);
+                                                                    ServerSideReplayRecorderServer.saveConfig();
+                                                                    source.sendFeedback(() -> Text.literal("Region %s forgotten".formatted(regionName)).formatted(Formatting.YELLOW), true);
+                                                                    return -1;
+                                                                } else {
+                                                                    context.getSource().sendError(Text.literal("Region %s is still recording".formatted(regionName)).formatted(Formatting.RED));
+                                                                    return 0;
+                                                                }
                                                             }
                                                         }
                                                 )
@@ -251,7 +258,7 @@ public class ReplayCommand {
                                                                             RegistryKey<World> registryKey = RegistryKey.of(RegistryKeys.WORLD, identifier);
                                                                             ServerWorld world = ServerSideReplayRecorderServer.server.getWorld(registryKey);
                                                                             if (world != null) {
-                                                                                CompletableFuture<RegionRecorder> future = RegionRecorder.createAsync(regionName, new ChunkPos(cfg.minX(), cfg.minZ()), new ChunkPos(cfg.maxX(), cfg.maxZ()), world);
+                                                                                CompletableFuture<RegionRecorder> future = RegionRecorder.createAsync(regionName, new ChunkPos(cfg.min().x(), cfg.min().z()), new ChunkPos(cfg.max().x(), cfg.max().z()), world);
                                                                                 future.thenAcceptAsync(r -> source.sendFeedback(() -> Text.literal("Started Recording Region %s, from %d %d to %d %d in %s".formatted(regionName, r.region.min.x, r.region.min.z, r.region.max.x, r.region.max.z, cfg.world())).formatted(Formatting.YELLOW), true), source.getServer());
                                                                                 future.exceptionallyAsync(throwable -> {
                                                                                     throwable.printStackTrace();
@@ -316,9 +323,9 @@ public class ReplayCommand {
                                                                 ServerCommandSource source = context.getSource();
                                                                 source.sendFeedback(() -> Text.literal("Region %s:".formatted(regionName)).formatted(Formatting.YELLOW), true);
                                                                 source.sendFeedback(() -> Text.literal("Dimension: %s".formatted(cfg.world())).formatted(Formatting.YELLOW), true);
-                                                                source.sendFeedback(() -> Text.literal("Area: %d %d to %d %d".formatted(cfg.minX(), cfg.minZ(), cfg.maxX(), cfg.maxZ())).formatted(Formatting.YELLOW), true);
+                                                                source.sendFeedback(() -> Text.literal("Area: %d %d to %d %d".formatted(cfg.min().x(), cfg.min().z(), cfg.max().x(), cfg.max().z())).formatted(Formatting.YELLOW), true);
                                                                 if (recorder != null) {
-                                                                    source.sendFeedback(() -> Text.literal("Status: Recording").formatted(Formatting.YELLOW), true);
+                                                                    source.sendFeedback(() -> Text.literal("Status: %s".formatted(recorder.getStatus().toString())).formatted(Formatting.YELLOW), true);
                                                                     source.sendFeedback(() -> Text.literal("Uptime: %s".formatted(DurationFormatUtils.formatDurationWords(recorder.getUptime().toMillis(), true, true))).formatted(Formatting.YELLOW), true);
                                                                     source.sendFeedback(() -> Text.literal("Size: %s".formatted(FileUtils.byteCountToDisplaySize(recorder.getFileSize()))).formatted(Formatting.YELLOW), true);
                                                                     return 2;
@@ -485,7 +492,7 @@ public class ReplayCommand {
                                                 .executes(
                                                         context -> {
                                                             ServerPlayerEntity player = EntityArgumentType.getPlayer(context, "player");
-                                                            PlayerRecorder recorder = PlayerRecorder.playerRecorderMap.get(player.networkHandler.connection);
+                                                            PlayerRecorder recorder = PlayerRecorder.playerRecorderMap.get(((ServerCommonNetworkHandlerAccessor) player.networkHandler).getConnection());
                                                             if (recorder != null) {
                                                                 recorder.addMarker(null);
                                                                 context.getSource().sendFeedback(() -> Text.literal("Added a marker on Player %s Recording".formatted(player.getGameProfile().getName())), true);
